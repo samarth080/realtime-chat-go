@@ -47,7 +47,7 @@ func (d *MessageDispatcher) Dispatch(env ws.InboundEnvelope) {
 
 	switch base.Type {
 	case "message":
-		if err := chat.HandleDM(env.Ctx, d.pool, d.hub, d.rdb, d.router, env.SenderID, env.SenderName, env.Data); err != nil {
+		if err := chat.HandleDM(env.Ctx, d.pool, d.hub, d.router, env.SenderID, env.SenderName, env.Data); err != nil {
 			log.Printf("HandleDM error: %v", err)
 		}
 	case "group_message":
