@@ -11,7 +11,6 @@ type Client struct {
 	UserID   uuid.UUID
 	Username string
 	send     chan []byte
-	// conn is set by real WebSocket connections; nil for test clients
 }
 
 // Send channel exposed for testing

@@ -24,7 +24,7 @@ type ConnectHook func(userID uuid.UUID)
 type DisconnectHook func(userID uuid.UUID)
 
 // ServeWS handles GET /ws — requires JWTAuth middleware to have set user_id and username
-func ServeWS(hub *Hub, dispatcher Dispatcher, onConnect, onDisconnect ConnectHook) gin.HandlerFunc {
+func ServeWS(hub *Hub, dispatcher Dispatcher, onConnect ConnectHook, onDisconnect DisconnectHook) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID, ok := c.MustGet("user_id").(uuid.UUID)
 		if !ok {
@@ -39,7 +39,7 @@ func ServeWS(hub *Hub, dispatcher Dispatcher, onConnect, onDisconnect ConnectHoo
 			return
 		}
 
-		client := newRealClient(userID, username, conn)
+		client := newRealClient(userID, username)
 		hub.Register(client)
 
 		if onConnect != nil {

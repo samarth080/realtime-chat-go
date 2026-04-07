@@ -30,7 +30,7 @@ type Dispatcher interface {
 }
 
 // newRealClient creates a Client backed by a real WebSocket connection
-func newRealClient(userID uuid.UUID, username string, conn *websocket.Conn) *Client {
+func newRealClient(userID uuid.UUID, username string) *Client {
 	return &Client{
 		UserID:   userID,
 		Username: username,
