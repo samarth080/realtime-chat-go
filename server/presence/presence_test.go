@@ -14,7 +14,10 @@ import (
 func testRedis(t *testing.T) *redis.Client {
 	t.Helper()
 	rdb := redis.NewClient(&redis.Options{Addr: "localhost:6379"})
-	require.NoError(t, rdb.Ping(context.Background()).Err())
+	if err := rdb.Ping(context.Background()).Err(); err != nil {
+		rdb.Close()
+		t.Skipf("Redis not available at localhost:6379: %v", err)
+	}
 	t.Cleanup(func() { rdb.Close() })
 	return rdb
 }

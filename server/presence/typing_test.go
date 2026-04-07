@@ -23,7 +23,7 @@ func TestSetTyping_FanOut(t *testing.T) {
 	recvClient := ws.NewTestClient(receiverID, "bob")
 	hub.Register(recvClient)
 
-	presence.SetTyping(ctx, rdb, hub, chatID, senderID, "alice", []uuid.UUID{senderID, receiverID})
+	require.NoError(t, presence.SetTyping(ctx, rdb, hub, chatID, senderID, "alice", []uuid.UUID{senderID, receiverID}))
 
 	msg := <-recvClient.Send()
 	var out map[string]interface{}
