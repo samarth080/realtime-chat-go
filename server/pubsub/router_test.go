@@ -37,7 +37,7 @@ func TestPublishAndDeliver(t *testing.T) {
 	router.Subscribe(ctx, receiverID)
 
 	msg := []byte(`{"type":"message","body":"hello from other instance"}`)
-	pubsub.Publish(ctx, rdb, receiverID, msg)
+	require.NoError(t, pubsub.Publish(ctx, rdb, receiverID, msg))
 
 	select {
 	case received := <-client.Send():

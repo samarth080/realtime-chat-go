@@ -16,8 +16,8 @@ func channelName(userID uuid.UUID) string {
 }
 
 // Publish sends a message to a user's Redis pub/sub channel
-func Publish(ctx context.Context, rdb *redis.Client, userID uuid.UUID, data []byte) {
-	rdb.Publish(ctx, channelName(userID), data)
+func Publish(ctx context.Context, rdb *redis.Client, userID uuid.UUID, data []byte) error {
+	return rdb.Publish(ctx, channelName(userID), data).Err()
 }
 
 // Router subscribes to Redis channels and delivers messages to local hub clients
@@ -68,6 +68,6 @@ func (r *Router) Unsubscribe(userID uuid.UUID) {
 }
 
 // Publish satisfies chat.Router interface
-func (r *Router) Publish(ctx context.Context, userID uuid.UUID, data []byte) {
-	Publish(ctx, r.rdb, userID, data)
+func (r *Router) Publish(ctx context.Context, userID uuid.UUID, data []byte) error {
+	return Publish(ctx, r.rdb, userID, data)
 }

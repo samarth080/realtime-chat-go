@@ -20,7 +20,7 @@ type dmInbound struct {
 
 // Router abstracts pub/sub delivery for cross-instance routing (implemented in Plan 2)
 type Router interface {
-	Publish(ctx context.Context, userID uuid.UUID, data []byte)
+	Publish(ctx context.Context, userID uuid.UUID, data []byte) error
 }
 
 // HandleDM processes a direct message — inserts to DB, delivers locally or via pub/sub
@@ -56,7 +56,9 @@ func HandleDM(ctx context.Context, pool *pgxpool.Pool, hub *ws.Hub, router Route
 
 	// Try local delivery first; fall back to pub/sub for cross-instance
 	if !hub.Send(receiverID, outbound) && router != nil {
-		router.Publish(ctx, receiverID, outbound)
+		if err := router.Publish(ctx, receiverID, outbound); err != nil {
+			return fmt.Errorf("pub/sub delivery failed: %w", err)
+		}
 	}
 
 	ack, _ := json.Marshal(map[string]interface{}{
