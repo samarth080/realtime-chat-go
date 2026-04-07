@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	_ "github.com/redis/go-redis/v9"
 	"github.com/samarth080/peer-chat/auth"
 	"github.com/samarth080/peer-chat/chat"
 	"github.com/samarth080/peer-chat/config"
