@@ -25,26 +25,23 @@ func TestAllow_UnderLimit(t *testing.T) {
 	rdb := testRedis(t)
 	ctx := context.Background()
 	id := uuid.New()
+	t.Cleanup(func() { rdb.Del(ctx, "rate:"+id.String()) })
 	limiter := ratelimit.New(rdb, 5, 60)
 
 	for i := 0; i < 5; i++ {
 		require.True(t, limiter.Allow(ctx, id), "expected allow on call %d", i+1)
 	}
-
-	// cleanup
-	rdb.Del(ctx, "rate:"+id.String())
 }
 
 func TestAllow_OverLimit(t *testing.T) {
 	rdb := testRedis(t)
 	ctx := context.Background()
 	id := uuid.New()
+	t.Cleanup(func() { rdb.Del(ctx, "rate:"+id.String()) })
 	limiter := ratelimit.New(rdb, 3, 60)
 
 	for i := 0; i < 3; i++ {
-		limiter.Allow(ctx, id)
+		require.True(t, limiter.Allow(ctx, id), "expected allow on call %d", i+1)
 	}
 	require.False(t, limiter.Allow(ctx, id))
-
-	rdb.Del(ctx, "rate:"+id.String())
 }
