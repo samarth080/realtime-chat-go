@@ -1,91 +1,139 @@
-# 💬 Peer-to-Peer Conversation Management System
+# realtime-chat-go
 
-A robust and scalable backend system for real-time one-on-one and group messaging, built with **Python (Flask)** and **MySQL**. This project demonstrates practical application of **DBMS concepts** in a modern web-based communication platform.
-
----
-
-# Preview
-> https://github.com/user-attachments/assets/71d29fed-38a6-4eb1-9c6d-0cfc50441c55
-
-
-
-
-
-
-## 🚀 Features
-
-### 🔐 Authentication & User Management
-- Secure user registration
-- Unique usernames enforced
-
-### 📬 Direct Messaging
-- One-on-one message exchange
-- Automatic chat session creation
-- Read receipts with timestamps
-- Message deletion with ownership checks
-
-### 👥 Group Chat
-- Group creation with admin roles
-- Add/remove/list group members
-- Group messaging with read tracking
-- Permission-controlled message deletion
-
-### 📊 Message Tracking
-- Real-time read receipt generation
-- Read status views (direct + group messages)
-
-### 🧠 Intelligent Backend
-- Action-based routing for clean API design
-- Robust JSON parsing with error handling
-- Secure connection lifecycle management
+A production-grade real-time chat backend built with **Go**, **PostgreSQL**, and **Redis**. Features WebSocket-based messaging, JWT authentication, Redis pub/sub for horizontal scaling, WebRTC signaling, presence tracking, typing indicators, and rate limiting.
 
 ---
 
-## 🧱 Database Design
+## Tech Stack
 
-All database tables are **normalized up to 3NF**, ensuring:
-- ✅ Atomic, consistent data
-- ✅ No redundancy or transitive dependencies
-- ✅ Clean relational structure with foreign keys
-
-> The schema supports core entities: `users`, `userChats`, `messages`, `read_receipts`, `groups`, `group_members`, `group_messages`, and `group_read_receipts`.
-
----
-
-## 🛠️ Tech Stack
-
-| Layer       | Technology          |
-|-------------|---------------------|
-| Backend     | Python (Flask)      |
-| Database    | MySQL               |
-| API Format  | JSON over WebSocket |
-| Interface   | Terminal/WebSocket clients |
+| Layer | Technology |
+|-------|-----------|
+| Server | Go 1.22, Gin, Gorilla WebSocket |
+| Auth | JWT (HS256), bcrypt |
+| Database | PostgreSQL 16, pgx/v5 |
+| Cache / Pub-Sub | Redis 7, go-redis/v9 |
+| Frontend | React 18, Vite, Tailwind CSS *(in progress)* |
+| CLI Client | Go *(in progress)* |
+| Deploy | Fly.io *(in progress)* |
 
 ---
 
-## ⚙️ Project Workflow
+## Features
 
-### 1. **User Registration**
-- Endpoint: `register`
-- Stores new users in the DB with unique usernames
+### Authentication
+- `POST /auth/register` — bcrypt password hashing (cost 12), returns JWT
+- `POST /auth/login` — verifies hash, returns JWT
+- JWT validated on every WebSocket upgrade — sender identity never trusted from client payload
 
-### 2. **Direct Messaging**
-- Send/receive messages
-- Mark messages as read
-- View message history
-- Delete messages securely
+### WebSocket Messaging
+- Goroutine-per-connection model with a mutex-protected hub
+- Direct messages with find-or-create chat, DB persistence, delivery ack
+- Group messaging with membership checks and fan-out (skipping sender)
+- Group management: create, add member, leave
 
-### 3. **Group Messaging**
-- Create and manage groups
-- Send/receive group messages
-- View who read each group message
-- Group-based message deletion by sender/admin
+### Redis Layer
+- **Presence** — `SET presence:{user_id} online EX 30`, refreshed by heartbeat ping every 20s
+- **Typing indicators** — ephemeral Redis key with 5s TTL, fans out to chat members
+- **Rate limiting** — atomic INCR + ExpireNX (fixed window, 30 msg/60s per user)
+- **Cross-instance pub/sub** — messages routed via `chat:user:{id}` channels when sender and receiver are on different server instances
+
+### Delivery Pipeline
+1. Client sends `{"type":"message","to":"<user_id>","body":"...","id":"<client-uuid>"}`
+2. JWT middleware extracts sender identity
+3. Rate limit checked via Redis
+4. Message inserted into PostgreSQL
+5. Local delivery attempted via hub; falls back to Redis pub/sub if receiver is on another instance
+6. Sender receives `{"type":"sent","message_id":"..."}` ack
+
+### Database Schema
+- UUID primary keys throughout (no enumeration attacks)
+- `messages.status` — `sent | delivered | read` with CHECK constraint
+- Composite index on `(chat_id, created_at DESC)` for efficient pagination
+- `ON DELETE CASCADE` throughout — no orphan rows
 
 ---
 
-## 🧪 Testing & Results
+## Project Structure
 
-- All routes tested with valid and invalid inputs
-- Real-time read receipts and message tracking work as expected
-- Group permissions (admin, member) correctly enforced
-- Secure error handling with clear, consistent responses
+```
+realtime-chat-go/
+├── server/
+│   ├── main.go              # Entry point, router, dispatcher
+│   ├── auth/                # JWT + bcrypt, register/login handlers
+│   ├── ws/                  # WebSocket hub, client, handler
+│   ├── chat/                # DM + group message handlers
+│   ├── presence/            # Online/offline + typing indicators
+│   ├── ratelimit/           # Redis sliding window rate limiter
+│   ├── pubsub/              # Cross-instance pub/sub router
+│   ├── db/                  # PostgreSQL queries (pgx)
+│   ├── middleware/          # JWT validation middleware
+│   └── config/              # Environment config
+├── migrations/              # PostgreSQL schema (golang-migrate)
+├── docker-compose.yml       # Local dev: server + postgres + redis
+├── Dockerfile               # Multi-stage Go build
+└── .env.example
+```
+
+---
+
+## Local Development
+
+**Prerequisites:** Docker, Go 1.22+
+
+```bash
+# Start PostgreSQL + Redis
+docker-compose up -d
+
+# Copy env and fill in values
+cp .env.example .env
+
+# Run migrations
+migrate -path migrations -database "$DATABASE_URL" up
+
+# Start server
+cd server && go run .
+```
+
+**Environment variables:**
+```
+PORT=8080
+DATABASE_URL=postgres://chat:chat@localhost:5432/chatdb?sslmode=disable
+REDIS_URL=redis://localhost:6379
+JWT_SECRET=<random 32-byte hex>
+ENV=development
+```
+
+---
+
+## WebSocket Protocol
+
+Connect: `GET /ws?token=<jwt>`
+
+**Client → Server:**
+```json
+{"type": "message",       "to": "<user_id>",  "body": "hello", "id": "<client-uuid>"}
+{"type": "group_message", "to": "<group_id>", "body": "hello", "id": "<client-uuid>"}
+{"type": "typing",        "chat_id": "<id>",  "members": ["<id1>", "<id2>"]}
+{"type": "ack",           "message_id": "<uuid>"}
+{"type": "ping"}
+```
+
+**Server → Client:**
+```json
+{"type": "message",   "from": "<user_id>", "body": "...", "message_id": "<uuid>", "timestamp": "..."}
+{"type": "delivered", "message_id": "<uuid>"}
+{"type": "typing",    "from": "<username>", "chat_id": "<uuid>"}
+{"type": "presence",  "user_id": "<uuid>", "status": "online|offline"}
+{"type": "pong"}
+```
+
+---
+
+## What This Demonstrates
+
+- **Go concurrency** — goroutine-per-connection, channel-based hub, no mutex on the hot read path
+- **Distributed systems** — Redis pub/sub for cross-instance routing; adding server instances scales horizontally
+- **Real-time architecture** — fan-out delivery, offline queue, delivery status tracking
+- **WebRTC** — signaling server for SDP/ICE relay, P2P DataChannel *(in progress)*
+- **Production readiness** — JWT auth, bcrypt, rate limiting, Docker, health checks
+- **Database design** — UUID PKs, composite indexes, cascading deletes, type-safe pgx queries
