@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/redis/go-redis/v9"
 	"github.com/samarth080/peer-chat/db"
 	"github.com/samarth080/peer-chat/ws"
 )
@@ -24,7 +25,7 @@ type Router interface {
 }
 
 // HandleDM processes a direct message — inserts to DB, delivers locally or via pub/sub
-func HandleDM(ctx context.Context, pool *pgxpool.Pool, hub *ws.Hub, router Router, senderID uuid.UUID, senderName string, raw []byte) error {
+func HandleDM(ctx context.Context, pool *pgxpool.Pool, hub *ws.Hub, rdb *redis.Client, router Router, senderID uuid.UUID, senderName string, raw []byte) error {
 	var msg dmInbound
 	if err := json.Unmarshal(raw, &msg); err != nil {
 		return fmt.Errorf("invalid dm payload: %w", err)
