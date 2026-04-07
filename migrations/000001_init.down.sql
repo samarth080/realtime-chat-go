@@ -1,0 +1,10 @@
+DROP TABLE IF EXISTS read_receipts;
+DROP TABLE IF EXISTS group_read_receipts;
+DROP TABLE IF EXISTS group_messages;
+DROP TABLE IF EXISTS group_members;
+DROP TABLE IF EXISTS groups;
+DROP TABLE IF EXISTS messages;
+DROP TABLE IF EXISTS chat_members;
+DROP TABLE IF EXISTS chats;
+DROP TABLE IF EXISTS users;
+DROP EXTENSION IF EXISTS "uuid-ossp";
