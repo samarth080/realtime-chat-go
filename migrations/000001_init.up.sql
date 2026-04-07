@@ -23,7 +23,7 @@ CREATE TABLE messages (
     chat_id    UUID NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
     sender_id  UUID NOT NULL REFERENCES users(id),
     body       TEXT NOT NULL,
-    status     TEXT NOT NULL DEFAULT 'sent',
+    status     TEXT NOT NULL DEFAULT 'sent' CHECK (status IN ('sent', 'delivered', 'read')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX idx_messages_chat_time ON messages(chat_id, created_at DESC);
@@ -32,14 +32,14 @@ CREATE INDEX idx_messages_sender    ON messages(sender_id);
 CREATE TABLE groups (
     id         UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name       TEXT UNIQUE NOT NULL,
-    created_by UUID NOT NULL REFERENCES users(id),
+    created_by UUID REFERENCES users(id) ON DELETE SET NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE group_members (
     group_id  UUID NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
     user_id   UUID NOT NULL REFERENCES users(id)  ON DELETE CASCADE,
-    role      TEXT NOT NULL DEFAULT 'member',
+    role      TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('member', 'admin')),
     joined_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     PRIMARY KEY (group_id, user_id)
 );
