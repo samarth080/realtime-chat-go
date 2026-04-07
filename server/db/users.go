@@ -2,12 +2,15 @@ package db
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+var ErrNotFound = errors.New("not found")
 
 type User struct {
 	ID           uuid.UUID
@@ -35,7 +38,7 @@ func GetUserByUsername(ctx context.Context, pool *pgxpool.Pool, username string)
 		username,
 	).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.CreatedAt)
 	if err == pgx.ErrNoRows {
-		return User{}, pgx.ErrNoRows
+		return User{}, ErrNotFound
 	}
 	return u, err
 }
@@ -48,7 +51,7 @@ func GetUserByID(ctx context.Context, pool *pgxpool.Pool, id uuid.UUID) (User, e
 		id,
 	).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.CreatedAt)
 	if err == pgx.ErrNoRows {
-		return User{}, pgx.ErrNoRows
+		return User{}, ErrNotFound
 	}
 	return u, err
 }
