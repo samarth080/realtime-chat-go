@@ -16,13 +16,13 @@ func key(userID uuid.UUID) string {
 }
 
 // SetOnline marks a user as online with a 30s TTL (refreshed by heartbeat)
-func SetOnline(ctx context.Context, rdb *redis.Client, userID uuid.UUID) {
-	rdb.Set(ctx, key(userID), "online", ttl)
+func SetOnline(ctx context.Context, rdb *redis.Client, userID uuid.UUID) error {
+	return rdb.Set(ctx, key(userID), "online", ttl).Err()
 }
 
 // SetOffline removes a user's presence key immediately
-func SetOffline(ctx context.Context, rdb *redis.Client, userID uuid.UUID) {
-	rdb.Del(ctx, key(userID))
+func SetOffline(ctx context.Context, rdb *redis.Client, userID uuid.UUID) error {
+	return rdb.Del(ctx, key(userID)).Err()
 }
 
 // IsOnline returns true if the user has an active presence key
@@ -32,9 +32,9 @@ func IsOnline(ctx context.Context, rdb *redis.Client, userID uuid.UUID) bool {
 }
 
 // GetPresenceBatch returns a map of userID -> isOnline for a slice of user IDs
-func GetPresenceBatch(ctx context.Context, rdb *redis.Client, userIDs []uuid.UUID) map[uuid.UUID]bool {
+func GetPresenceBatch(ctx context.Context, rdb *redis.Client, userIDs []uuid.UUID) (map[uuid.UUID]bool, error) {
 	if len(userIDs) == 0 {
-		return nil
+		return map[uuid.UUID]bool{}, nil
 	}
 
 	keys := make([]string, len(userIDs))
@@ -43,13 +43,13 @@ func GetPresenceBatch(ctx context.Context, rdb *redis.Client, userIDs []uuid.UUI
 	}
 
 	vals, err := rdb.MGet(ctx, keys...).Result()
+	if err != nil {
+		return nil, err
+	}
+
 	result := make(map[uuid.UUID]bool, len(userIDs))
 	for i, id := range userIDs {
-		if err == nil && vals[i] != nil {
-			result[id] = true
-		} else {
-			result[id] = false
-		}
+		result[id] = vals[i] != nil
 	}
-	return result
+	return result, nil
 }
