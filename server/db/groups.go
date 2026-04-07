@@ -86,12 +86,15 @@ func AddGroupMember(ctx context.Context, pool *pgxpool.Pool, groupID, userID uui
 	return err
 }
 
-func RemoveGroupMember(ctx context.Context, pool *pgxpool.Pool, groupID, userID uuid.UUID) error {
-	_, err := pool.Exec(ctx,
+func RemoveGroupMember(ctx context.Context, pool *pgxpool.Pool, groupID, userID uuid.UUID) (bool, error) {
+	tag, err := pool.Exec(ctx,
 		`DELETE FROM group_members WHERE group_id = $1 AND user_id = $2`,
 		groupID, userID,
 	)
-	return err
+	if err != nil {
+		return false, err
+	}
+	return tag.RowsAffected() > 0, nil
 }
 
 func GetGroupMembers(ctx context.Context, pool *pgxpool.Pool, groupID uuid.UUID) ([]GroupMemberInfo, error) {

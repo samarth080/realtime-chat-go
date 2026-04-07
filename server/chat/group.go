@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -85,8 +86,11 @@ func HandleCreateGroup(ctx context.Context, pool *pgxpool.Pool, hub *ws.Hub, cre
 
 	group, err := db.CreateGroup(ctx, pool, payload.Name, creatorID)
 	if err != nil {
-		sendError(hub, creatorID, "group name already taken")
-		return nil
+		if strings.Contains(err.Error(), "unique") || strings.Contains(err.Error(), "23505") {
+			sendError(hub, creatorID, "group name already taken")
+			return nil
+		}
+		return fmt.Errorf("create group: %w", err)
 	}
 
 	resp, _ := json.Marshal(map[string]interface{}{
@@ -154,8 +158,13 @@ func HandleLeaveGroup(ctx context.Context, pool *pgxpool.Pool, hub *ws.Hub, user
 		return err
 	}
 
-	if err := db.RemoveGroupMember(ctx, pool, groupID, userID); err != nil {
+	removed, err := db.RemoveGroupMember(ctx, pool, groupID, userID)
+	if err != nil {
 		return err
+	}
+	if !removed {
+		sendError(hub, userID, "you are not a member of this group")
+		return nil
 	}
 
 	resp, _ := json.Marshal(map[string]interface{}{
