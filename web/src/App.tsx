@@ -1,3 +1,8 @@
+import { useStore } from './store'
+import { LoginPage } from './pages/LoginPage'
+import { ChatPage } from './pages/ChatPage'
+
 export default function App() {
-  return <div className="min-h-screen bg-gray-950 text-white flex items-center justify-center">Loading...</div>
+  const token = useStore((s) => s.token)
+  return token ? <ChatPage /> : <LoginPage />
 }
