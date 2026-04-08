@@ -7,6 +7,7 @@ import { useStore } from '../store'
 export function ChatPage() {
   const { send } = useWebSocket()
   const username = useStore((s) => s.username)
+  const userId = useStore((s) => s.userId)
   const clearAuth = useStore((s) => s.clearAuth)
   const [selectedContact, setSelectedContact] = useState<{ id: string; name: string } | null>(null)
   const [contactInput, setContactInput] = useState('')
@@ -21,9 +22,18 @@ export function ChatPage() {
     <div className="h-screen flex flex-col bg-gray-950">
       <div className="flex items-center justify-between px-4 py-2 bg-gray-900 border-b border-gray-800">
         <span className="text-white font-semibold">P2P Chat — {username}</span>
-        <button onClick={clearAuth} className="text-gray-400 hover:text-white text-sm transition">
-          Logout
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => navigator.clipboard.writeText(userId ?? '')}
+            className="text-gray-400 hover:text-white text-xs border border-gray-700 rounded px-2 py-1 transition"
+            title={userId ?? ''}
+          >
+            Copy my ID
+          </button>
+          <button onClick={clearAuth} className="text-gray-400 hover:text-white text-sm transition">
+            Logout
+          </button>
+        </div>
       </div>
 
       <div className="flex flex-1 overflow-hidden">
