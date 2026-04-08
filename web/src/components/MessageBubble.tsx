@@ -7,7 +7,7 @@ interface Props {
 }
 
 export function MessageBubble({ body, from, timestamp, mine, status }: Props) {
-  const tick = status === 'read' ? '✓✓' : status === 'delivered' ? '✓✓' : '✓'
+  const tick = status === 'read' || status === 'delivered' ? '✓✓' : '✓'
   const tickColor = status === 'read' ? 'text-blue-400' : 'text-gray-400'
 
   return (

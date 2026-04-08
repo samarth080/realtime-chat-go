@@ -33,7 +33,7 @@ export function ChatWindow({ partnerId, partnerName, send }: Props) {
   function handleSend() {
     if (!body.trim()) return
     const id = uuidv4()
-    addDMMessage(userId!, {
+    addDMMessage(partnerId, {
       id,
       from: username!,
       from_id: userId!,

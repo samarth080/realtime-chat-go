@@ -24,7 +24,7 @@ export function useWebSocket() {
     ws.onopen = () => {
       reconnectDelay.current = 1000
       const hb = setInterval(() => ws.readyState === WebSocket.OPEN && ws.send(JSON.stringify({ type: 'ping' })), 20000)
-      ws.onclose = () => clearInterval(hb)
+      ws.addEventListener('close', () => clearInterval(hb), { once: true })
     }
 
     ws.onmessage = (event) => {
