@@ -14,82 +14,95 @@ export function useWebSocket() {
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const reconnectDelay = useRef(1000)
 
-  const connect = useCallback(() => {
+  // Keep store callbacks in a ref so the effect never needs to re-run for them
+  const cbRef = useRef({ addDMMessage, addGroupMessage, setPresence, setTyping })
+  useEffect(() => {
+    cbRef.current = { addDMMessage, addGroupMessage, setPresence, setTyping }
+  })
+
+  useEffect(() => {
     if (!token) return
 
-    const url = `${WS_URL}/ws?token=${token}`
-    const ws = new WebSocket(url)
-    wsRef.current = ws
+    let cancelled = false
 
-    ws.onopen = () => {
-      reconnectDelay.current = 1000
-      const hb = setInterval(() => ws.readyState === WebSocket.OPEN && ws.send(JSON.stringify({ type: 'ping' })), 20000)
-      ws.addEventListener('close', () => clearInterval(hb), { once: true })
-    }
+    function connect() {
+      if (cancelled) return
 
-    ws.onmessage = (event) => {
-      let msg: Record<string, unknown>
-      try { msg = JSON.parse(event.data) } catch { return }
+      const url = `${WS_URL}/ws?token=${token}`
+      const ws = new WebSocket(url)
+      wsRef.current = ws
 
-      switch (msg.type) {
-        case 'message': {
-          const fromId = msg.from_id as string
-          addDMMessage(fromId, {
-            id: msg.message_id as string,
-            from: msg.from as string,
-            from_id: fromId,
-            body: msg.body as string,
-            timestamp: msg.timestamp as string,
-            status: 'delivered',
-            mine: false,
-          })
-          break
+      ws.onopen = () => {
+        reconnectDelay.current = 1000
+        const hb = setInterval(
+          () => ws.readyState === WebSocket.OPEN && ws.send(JSON.stringify({ type: 'ping' })),
+          20000,
+        )
+        ws.addEventListener('close', () => clearInterval(hb), { once: true })
+      }
+
+      ws.onmessage = (event) => {
+        let msg: Record<string, unknown>
+        try { msg = JSON.parse(event.data) } catch { return }
+        const { addDMMessage, addGroupMessage, setPresence, setTyping } = cbRef.current
+
+        switch (msg.type) {
+          case 'message': {
+            const fromId = msg.from_id as string
+            addDMMessage(fromId, {
+              id: msg.message_id as string,
+              from: msg.from as string,
+              from_id: fromId,
+              body: msg.body as string,
+              timestamp: msg.timestamp as string,
+              status: 'delivered',
+              mine: false,
+            })
+            break
+          }
+          case 'sent':
+            break
+          case 'group_message':
+            addGroupMessage(msg.group_id as string, {
+              id: msg.message_id as string,
+              from: msg.from as string,
+              from_id: msg.from_id as string,
+              body: msg.body as string,
+              timestamp: msg.timestamp as string,
+              group_id: msg.group_id as string,
+            })
+            break
+          case 'presence':
+            setPresence(msg.user_id as string, msg.status === 'online')
+            break
+          case 'typing': {
+            const chatId = (msg.chat_id ?? msg.group_id) as string
+            setTyping(chatId, true)
+            setTimeout(() => setTyping(chatId, false), 5000)
+            break
+          }
+          case 'pong':
+            break
         }
-        case 'sent': {
-          console.log('message sent:', msg.message_id)
-          break
-        }
-        case 'group_message': {
-          addGroupMessage(msg.group_id as string, {
-            id: msg.message_id as string,
-            from: msg.from as string,
-            from_id: msg.from_id as string,
-            body: msg.body as string,
-            timestamp: msg.timestamp as string,
-            group_id: msg.group_id as string,
-          })
-          break
-        }
-        case 'presence':
-          setPresence(msg.user_id as string, msg.status === 'online')
-          break
-        case 'typing': {
-          const chatId = (msg.chat_id ?? msg.group_id) as string
-          setTyping(chatId, true)
-          setTimeout(() => setTyping(chatId, false), 5000)
-          break
-        }
-        case 'pong':
-          break
+      }
+
+      ws.onclose = () => {
+        if (reconnectTimer.current) clearTimeout(reconnectTimer.current)
+        reconnectTimer.current = setTimeout(() => {
+          reconnectDelay.current = Math.min(reconnectDelay.current * 2, 30000)
+          connect()
+        }, reconnectDelay.current)
       }
     }
 
-    ws.onclose = () => {
-      if (reconnectTimer.current) clearTimeout(reconnectTimer.current)
-      reconnectTimer.current = setTimeout(() => {
-        reconnectDelay.current = Math.min(reconnectDelay.current * 2, 30000)
-        connect()
-      }, reconnectDelay.current)
-    }
-  }, [token, addDMMessage, addGroupMessage, setPresence, setTyping])
-
-  useEffect(() => {
     connect()
+
     return () => {
+      cancelled = true
       wsRef.current?.close()
       if (reconnectTimer.current) clearTimeout(reconnectTimer.current)
     }
-  }, [connect])
+  }, [token]) // only re-run when token changes
 
   const send = useCallback((data: unknown) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
