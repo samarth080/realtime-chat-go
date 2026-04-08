@@ -15,7 +15,7 @@ export function ChatPage() {
   const dmMessages = useStore((s) => s.dmMessages)
   const contacts = Object.keys(dmMessages).map((id) => ({
     id,
-    name: dmMessages[id][0]?.from ?? id,
+    name: dmMessages[id].find((m) => m.from_id === id)?.from ?? id.slice(0, 8),
   }))
 
   return (

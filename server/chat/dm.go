@@ -55,10 +55,15 @@ func HandleDM(ctx context.Context, pool *pgxpool.Pool, hub *ws.Hub, router Route
 	})
 
 	// Try local delivery first; fall back to pub/sub for cross-instance
-	if !hub.Send(receiverID, outbound) && router != nil {
+	delivered := hub.Send(receiverID, outbound)
+	if !delivered && router != nil {
 		if err := router.Publish(ctx, receiverID, outbound); err != nil {
 			return fmt.Errorf("pub/sub delivery failed: %w", err)
 		}
+	}
+	// Mark delivered immediately so reconnect flow doesn't re-send
+	if delivered {
+		db.UpdateMessageStatus(ctx, pool, stored.ID, "delivered")
 	}
 
 	ack, _ := json.Marshal(map[string]interface{}{
