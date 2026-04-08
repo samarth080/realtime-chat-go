@@ -182,6 +182,25 @@ func main() {
 			log.Printf("presence.SetOnline: %v", err)
 		}
 		router.Subscribe(ctx, userID)
+
+		// Push any messages sent while the user was offline
+		pending, err := db.GetPendingMessages(ctx, pool, userID)
+		if err != nil {
+			log.Printf("GetPendingMessages: %v", err)
+			return
+		}
+		for _, m := range pending {
+			outbound, _ := json.Marshal(map[string]interface{}{
+				"type":       "message",
+				"from":       m.SenderUsername,
+				"from_id":    m.SenderID,
+				"body":       m.Body,
+				"message_id": m.ID,
+				"timestamp":  m.CreatedAt,
+			})
+			hub.Send(userID, outbound)
+			db.UpdateMessageStatus(ctx, pool, m.ID, "delivered")
+		}
 	}
 	onDisconnect := func(userID uuid.UUID) {
 		if err := presence.SetOffline(ctx, rdb, userID); err != nil {

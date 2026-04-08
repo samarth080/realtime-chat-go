@@ -70,6 +70,37 @@ func InsertMessage(ctx context.Context, pool *pgxpool.Pool, chatID, senderID uui
 	return m, err
 }
 
+type PendingMessage struct {
+	Message
+	SenderUsername string
+}
+
+func GetPendingMessages(ctx context.Context, pool *pgxpool.Pool, userID uuid.UUID) ([]PendingMessage, error) {
+	rows, err := pool.Query(ctx, `
+		SELECT m.id, m.chat_id, m.sender_id, m.body, m.status, m.created_at, u.username
+		FROM messages m
+		JOIN chat_members cm ON cm.chat_id = m.chat_id
+		JOIN users u ON u.id = m.sender_id
+		WHERE cm.user_id = $1 AND m.sender_id != $1 AND m.status = 'sent'
+		ORDER BY m.created_at ASC
+		LIMIT 100
+	`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var msgs []PendingMessage
+	for rows.Next() {
+		var m PendingMessage
+		if err := rows.Scan(&m.ID, &m.ChatID, &m.SenderID, &m.Body, &m.Status, &m.CreatedAt, &m.SenderUsername); err != nil {
+			return nil, err
+		}
+		msgs = append(msgs, m)
+	}
+	return msgs, rows.Err()
+}
+
 func GetUndeliveredMessages(ctx context.Context, pool *pgxpool.Pool, userID uuid.UUID) ([]Message, error) {
 	rows, err := pool.Query(ctx, `
 		SELECT m.id, m.chat_id, m.sender_id, m.body, m.status, m.created_at
