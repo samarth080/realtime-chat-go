@@ -91,6 +91,31 @@ func (d *MessageDispatcher) Dispatch(env ws.InboundEnvelope) {
 			log.Printf("SetOnline error: %v", err)
 		}
 		d.hub.Send(env.SenderID, []byte(`{"type":"pong"}`))
+	case "webrtc_offer", "webrtc_answer", "ice_candidate":
+		// Relay WebRTC signaling messages directly to the target peer
+		var payload struct {
+			To string `json:"to"`
+		}
+		if err := json.Unmarshal(env.Data, &payload); err != nil {
+			return
+		}
+		targetID, err := uuid.Parse(payload.To)
+		if err != nil {
+			return
+		}
+		// Rewrite "to" field to "from" so receiver knows who sent it
+		var raw map[string]interface{}
+		json.Unmarshal(env.Data, &raw)
+		raw["from"] = env.SenderID
+		raw["from_name"] = env.SenderName
+		delete(raw, "to")
+		out, _ := json.Marshal(raw)
+		// Try local hub first, then pub/sub for cross-instance
+		if !d.hub.Send(targetID, out) {
+			if err := d.router.Publish(env.Ctx, targetID, out); err != nil {
+				log.Printf("webrtc relay pub/sub error: %v", err)
+			}
+		}
 	}
 }
 
