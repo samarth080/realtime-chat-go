@@ -11,12 +11,11 @@ export function ChatPage() {
   const [selectedContact, setSelectedContact] = useState<{ id: string; name: string } | null>(null)
   const [contactInput, setContactInput] = useState('')
 
-  const contacts = useStore((s) =>
-    Object.keys(s.dmMessages).map((id) => ({
-      id,
-      name: s.dmMessages[id][0]?.from ?? id,
-    }))
-  )
+  const dmMessages = useStore((s) => s.dmMessages)
+  const contacts = Object.keys(dmMessages).map((id) => ({
+    id,
+    name: dmMessages[id][0]?.from ?? id,
+  }))
 
   return (
     <div className="h-screen flex flex-col bg-gray-950">
