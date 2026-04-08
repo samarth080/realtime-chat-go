@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
 
 export interface Message {
   id: string
@@ -57,21 +58,16 @@ interface ChatStore {
   setActiveChat: (id: string, type: 'dm' | 'group') => void
 }
 
-export const useStore = create<ChatStore>((set) => ({
-  token: localStorage.getItem('token'),
-  userId: localStorage.getItem('userId'),
-  username: localStorage.getItem('username'),
+export const useStore = create<ChatStore>()(persist((set) => ({
+  token: null,
+  userId: null,
+  username: null,
 
-  setAuth: (token, userId, username) => {
-    localStorage.setItem('token', token)
-    localStorage.setItem('userId', userId)
-    localStorage.setItem('username', username)
-    set({ token, userId, username })
-  },
-  clearAuth: () => {
-    localStorage.clear()
-    set({ token: null, userId: null, username: null })
-  },
+  setAuth: (token, userId, username) => set({ token, userId, username }),
+  clearAuth: () => set({
+    token: null, userId: null, username: null,
+    dmMessages: {}, groups: [], groupMessages: {},
+  }),
 
   dmMessages: {},
   addDMMessage: (chatPartnerId, msg) =>
@@ -104,4 +100,4 @@ export const useStore = create<ChatStore>((set) => ({
   activeChatId: null,
   activeChatType: null,
   setActiveChat: (id, type) => set({ activeChatId: id, activeChatType: type }),
-}))
+}), { name: 'p2p-chat-store' }))
