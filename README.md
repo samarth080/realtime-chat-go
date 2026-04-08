@@ -105,6 +105,42 @@ ENV=development
 
 ---
 
+## Deploy to Fly.io
+
+**Prerequisites:** [flyctl](https://fly.io/docs/hands-on/install-flyctl/) installed, logged in (`flyctl auth login`)
+
+```bash
+# Create app (name must be globally unique)
+flyctl apps create realtime-chat-go
+
+# Provision managed Postgres
+flyctl postgres create --name realtime-chat-db --region iad --initial-cluster-size 1 --vm-size shared-cpu-1x --volume-size 1
+flyctl postgres attach realtime-chat-db --app realtime-chat-go
+
+# Create Upstash Redis (free tier)
+flyctl redis create --name realtime-chat-redis --region iad --plan free
+# Copy the redis URL from output, then:
+flyctl secrets set REDIS_URL=<redis-url> --app realtime-chat-go
+flyctl secrets set JWT_SECRET=$(openssl rand -hex 32) --app realtime-chat-go
+flyctl secrets set ENV=production --app realtime-chat-go
+
+# Run migrations
+migrate -path migrations -database "$DATABASE_URL" up
+
+# Deploy
+flyctl deploy
+```
+
+**Frontend (Netlify):**
+```bash
+cd web
+npm run build
+netlify deploy --prod --dir dist
+```
+Set `VITE_WS_URL=wss://realtime-chat-go.fly.dev` in Netlify environment variables.
+
+---
+
 ## WebSocket Protocol
 
 Connect: `GET /ws?token=<jwt>`
