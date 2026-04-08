@@ -13,7 +13,7 @@ interface Props {
 export function ChatWindow({ partnerId, partnerName, send }: Props) {
   const userId = useStore((s) => s.userId)
   const username = useStore((s) => s.username)
-  const messages = useStore((s) => s.dmMessages[partnerId] ?? [])
+  const messages = useStore((s) => s.dmMessages[partnerId]) ?? []
   const isTyping = useStore((s) => s.typing[partnerId])
   const addDMMessage = useStore((s) => s.addDMMessage)
   const [body, setBody] = useState('')
