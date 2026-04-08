@@ -6,6 +6,21 @@ A production-grade real-time chat application built with **Go**, **PostgreSQL**,
 
 ---
 
+## Author
+
+**Samarth Chatli**
+GitHub: [@samarth080](https://github.com/samarth080)
+
+---
+
+## License
+
+Copyright (c) 2026 Samarth Chatli. All rights reserved.
+
+This project and its source code are proprietary. No part of this software may be reproduced, distributed, modified, sublicensed, sold, or used in any form without the prior written permission of the author. See [LICENSE](./LICENSE) for full terms.
+
+---
+
 ## Tech Stack
 
 | Layer | Technology |
