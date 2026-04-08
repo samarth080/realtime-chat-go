@@ -1,0 +1,101 @@
+import { useEffect, useRef, useCallback } from 'react'
+import { useStore } from '../store'
+
+const WS_URL = import.meta.env.VITE_WS_URL ?? ''
+
+export function useWebSocket() {
+  const token = useStore((s) => s.token)
+  const addDMMessage = useStore((s) => s.addDMMessage)
+  const addGroupMessage = useStore((s) => s.addGroupMessage)
+  const setPresence = useStore((s) => s.setPresence)
+  const setTyping = useStore((s) => s.setTyping)
+
+  const wsRef = useRef<WebSocket | null>(null)
+  const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const reconnectDelay = useRef(1000)
+
+  const connect = useCallback(() => {
+    if (!token) return
+
+    const url = `${WS_URL}/ws?token=${token}`
+    const ws = new WebSocket(url)
+    wsRef.current = ws
+
+    ws.onopen = () => {
+      reconnectDelay.current = 1000
+      const hb = setInterval(() => ws.readyState === WebSocket.OPEN && ws.send(JSON.stringify({ type: 'ping' })), 20000)
+      ws.onclose = () => clearInterval(hb)
+    }
+
+    ws.onmessage = (event) => {
+      let msg: Record<string, unknown>
+      try { msg = JSON.parse(event.data) } catch { return }
+
+      switch (msg.type) {
+        case 'message': {
+          const fromId = msg.from_id as string
+          addDMMessage(fromId, {
+            id: msg.message_id as string,
+            from: msg.from as string,
+            from_id: fromId,
+            body: msg.body as string,
+            timestamp: msg.timestamp as string,
+            status: 'delivered',
+            mine: false,
+          })
+          break
+        }
+        case 'sent': {
+          console.log('message sent:', msg.message_id)
+          break
+        }
+        case 'group_message': {
+          addGroupMessage(msg.group_id as string, {
+            id: msg.message_id as string,
+            from: msg.from as string,
+            from_id: msg.from_id as string,
+            body: msg.body as string,
+            timestamp: msg.timestamp as string,
+            group_id: msg.group_id as string,
+          })
+          break
+        }
+        case 'presence':
+          setPresence(msg.user_id as string, msg.status === 'online')
+          break
+        case 'typing': {
+          const chatId = (msg.chat_id ?? msg.group_id) as string
+          setTyping(chatId, true)
+          setTimeout(() => setTyping(chatId, false), 5000)
+          break
+        }
+        case 'pong':
+          break
+      }
+    }
+
+    ws.onclose = () => {
+      if (reconnectTimer.current) clearTimeout(reconnectTimer.current)
+      reconnectTimer.current = setTimeout(() => {
+        reconnectDelay.current = Math.min(reconnectDelay.current * 2, 30000)
+        connect()
+      }, reconnectDelay.current)
+    }
+  }, [token, addDMMessage, addGroupMessage, setPresence, setTyping])
+
+  useEffect(() => {
+    connect()
+    return () => {
+      wsRef.current?.close()
+      if (reconnectTimer.current) clearTimeout(reconnectTimer.current)
+    }
+  }, [connect])
+
+  const send = useCallback((data: unknown) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify(data))
+    }
+  }, [])
+
+  return { send }
+}
