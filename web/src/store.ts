@@ -37,6 +37,8 @@ interface ChatStore {
   // DMs: keyed by the other user's ID
   dmMessages: Record<string, Message[]>
   addDMMessage: (chatPartnerId: string, msg: Message) => void
+  // Swap client-generated UUID with server UUID and mark delivered
+  confirmDMMessage: (chatPartnerId: string, clientId: string, serverMessageId: string) => void
   updateDMMessageStatus: (chatPartnerId: string, messageId: string, status: Message['status']) => void
 
   // Groups
@@ -76,6 +78,15 @@ export const useStore = create<ChatStore>()(persist((set) => ({
       dmMessages: {
         ...s.dmMessages,
         [chatPartnerId]: [...(s.dmMessages[chatPartnerId] ?? []), msg],
+      },
+    })),
+  confirmDMMessage: (chatPartnerId, clientId, serverMessageId) =>
+    set((s) => ({
+      dmMessages: {
+        ...s.dmMessages,
+        [chatPartnerId]: (s.dmMessages[chatPartnerId] ?? []).map((m) =>
+          m.id === clientId ? { ...m, id: serverMessageId, status: 'delivered' } : m
+        ),
       },
     })),
   updateDMMessageStatus: (chatPartnerId, messageId, status) =>

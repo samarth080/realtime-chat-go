@@ -13,6 +13,7 @@ export function useWebSocket() {
   const token = useStore((s) => s.token)
   const dmMessages = useStore((s) => s.dmMessages)
   const addDMMessage = useStore((s) => s.addDMMessage)
+  const confirmDMMessage = useStore((s) => s.confirmDMMessage)
   const updateDMMessageStatus = useStore((s) => s.updateDMMessageStatus)
   const addGroupMessage = useStore((s) => s.addGroupMessage)
   const setPresence = useStore((s) => s.setPresence)
@@ -23,9 +24,9 @@ export function useWebSocket() {
   const reconnectDelay = useRef(1000)
 
   // Keep store callbacks in a ref so the effect never needs to re-run for them
-  const cbRef = useRef({ addDMMessage, updateDMMessageStatus, addGroupMessage, setPresence, setTyping, dmMessages })
+  const cbRef = useRef({ addDMMessage, confirmDMMessage, updateDMMessageStatus, addGroupMessage, setPresence, setTyping, dmMessages })
   useEffect(() => {
-    cbRef.current = { addDMMessage, updateDMMessageStatus, addGroupMessage, setPresence, setTyping, dmMessages }
+    cbRef.current = { addDMMessage, confirmDMMessage, updateDMMessageStatus, addGroupMessage, setPresence, setTyping, dmMessages }
   })
 
   useEffect(() => {
@@ -59,7 +60,7 @@ export function useWebSocket() {
       ws.onmessage = (event) => {
         let msg: Record<string, unknown>
         try { msg = JSON.parse(event.data) } catch { return }
-        const { addDMMessage, addGroupMessage, setPresence, setTyping } = cbRef.current
+        const { addDMMessage, confirmDMMessage, addGroupMessage, setPresence, setTyping } = cbRef.current
 
         switch (msg.type) {
           case 'message': {
@@ -77,10 +78,22 @@ export function useWebSocket() {
             checkPresence(ws, [fromId])
             break
           }
-          case 'sent':
+          case 'sent': {
+            // Server confirmed our message — swap client UUID → server UUID, mark delivered (✓✓ grey)
+            const clientId = msg.id as string
+            const serverMessageId = msg.message_id as string
+            const { dmMessages } = cbRef.current
+            for (const partnerId of Object.keys(dmMessages)) {
+              const found = dmMessages[partnerId]?.find((m) => m.id === clientId)
+              if (found) {
+                confirmDMMessage(partnerId, clientId, serverMessageId)
+                break
+              }
+            }
             break
+          }
           case 'read': {
-            // Server tells us our message was read — find which conversation and update
+            // Server tells us our message was read — update to blue ✓✓
             const messageId = msg.message_id as string
             const { dmMessages, updateDMMessageStatus } = cbRef.current
             for (const partnerId of Object.keys(dmMessages)) {
