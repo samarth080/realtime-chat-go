@@ -980,7 +980,7 @@ Also add the `Router` interface to `chat/dm.go` to avoid import cycle:
 ```go
 // Router abstracts pub/sub delivery for cross-instance routing
 type Router interface {
-	Publish(ctx context.Context, userID uuid.UUID, data []byte)
+	Publish(ctx context.Context, userID uuid.UUID, data []byte) error
 }
 ```
 
@@ -988,8 +988,8 @@ And update `pubsub/router.go` to add a `Publish` method on `*Router` so it satis
 
 ```go
 // Publish satisfies chat.Router interface
-func (r *Router) Publish(ctx context.Context, userID uuid.UUID, data []byte) {
-	Publish(ctx, r.rdb, userID, data)
+func (r *Router) Publish(ctx context.Context, userID uuid.UUID, data []byte) error {
+	return r.rdb.Publish(ctx, channelName(userID), data).Err()
 }
 ```
 

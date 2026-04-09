@@ -1,14 +1,14 @@
-# P2P Chat — Plan 3: React Frontend + Go CLI + Fly.io Deployment
+# P2P Chat — Plan 3: React Frontend + Go CLI + Deployment
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Status: Implemented** — All tasks complete. Deployed to Render + Netlify.
 
-**Goal:** Build a React frontend (login, DM chat, group chat with presence + typing indicators), a Go CLI client for demos/load testing, wire up WebRTC P2P signaling in the server, and deploy the full stack to Fly.io.
+**Goal:** Build a React frontend (login, DM chat, group chat with presence + typing indicators), a Go CLI client for demos/load testing, wire up WebRTC P2P signaling in the server, and deploy the full stack.
 
-**Architecture:** React 18 + Vite + Tailwind CSS. A `useWebSocket` hook manages the single WS connection and dispatches inbound messages to per-feature state. WebRTC signaling is handled by the same WS connection (offer/answer/ICE relay only — actual data goes P2P). Go CLI uses the same JSON protocol as the browser client. Fly.io hosts the Go binary; Fly Postgres + Upstash Redis provide managed data stores.
+**Architecture:** React 18 + Vite + Tailwind CSS. A `useWebSocket` hook manages the single WS connection and dispatches inbound messages to per-feature state. WebRTC signaling is handled by the same WS connection (offer/answer/ICE relay only — actual data goes P2P). Go CLI uses the same JSON protocol as the browser client. Render hosts the Go binary (Docker); Supabase + Upstash Redis provide managed data stores. Netlify hosts the React frontend.
 
 **Prerequisite:** Plans 1 and 2 complete and passing.
 
-**Tech Stack:** React 18, Vite 5, Tailwind CSS v3, `zustand` (state), Go CLI (`gorilla/websocket`), Fly.io, Docker multi-stage build
+**Tech Stack:** React 18, Vite 5, Tailwind CSS v3, `zustand` + `persist` middleware (state), Go CLI (`gorilla/websocket`), Render, Netlify, Docker multi-stage build
 
 ---
 

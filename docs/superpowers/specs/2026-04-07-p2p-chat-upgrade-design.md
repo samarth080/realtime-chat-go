@@ -1,6 +1,6 @@
 # P2P Chat System — Full Upgrade Design Spec
 **Date:** 2026-04-07  
-**Status:** Approved  
+**Status:** Implemented  
 **Scope:** Full rewrite from Python/MySQL proof-of-concept to production-grade Go backend + React frontend + Go CLI
 
 ---
@@ -58,16 +58,16 @@ peer-to-peer-chat/
 
 | Layer | Technology | Reason |
 |-------|-----------|--------|
-| Server language | Go 1.22 | Goroutines, strong concurrency, compiled binary |
+| Server language | Go 1.23 | Goroutines, strong concurrency, compiled binary |
 | HTTP/WebSocket | `gin` + `gorilla/websocket` | Battle-tested, performant |
 | Auth | JWT (`golang-jwt/jwt`), bcrypt | Industry standard |
 | Database | PostgreSQL 16 | ACID, JSON support, full-text search |
-| DB queries | `sqlc` | Type-safe generated queries, no ORM overhead |
+| DB queries | `pgx/v5` | Type-safe hand-written queries, no ORM overhead |
 | DB migrations | `golang-migrate` | Version-controlled schema |
 | Cache/PubSub | Redis 7, `go-redis/v9` | Pub/sub, presence, rate limiting, typing |
 | Frontend | React 18, Vite, Tailwind CSS | Fast dev, modern stack |
 | CLI client | Go, `gorilla/websocket` | Same language as server |
-| Deploy | Fly.io (server), Fly Postgres, Upstash Redis | Free tier, simple |
+| Deploy | Render (server), Supabase (Postgres), Upstash (Redis), Netlify (frontend) | Free tier, no credit card |
 
 ---
 
@@ -79,6 +79,15 @@ peer-to-peer-chat/
 - JWT payload: `{user_id: uuid, username: string, exp: unix}`
 - JWT secret loaded from environment variable `JWT_SECRET`
 - Tokens expire after 7 days
+
+### CORS
+All routes include CORS middleware allowing `*` origin — required for Netlify frontend to call the Render backend:
+```go
+c.Header("Access-Control-Allow-Origin", "*")
+c.Header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+// OPTIONS preflight → 204 No Content
+```
 
 ### WebSocket Auth
 - Client connects to `GET /ws?token=<jwt>`
@@ -250,19 +259,28 @@ Key improvements over current schema:
 5. INSERT into messages table (async via pgxpool)
    → message_id = server-generated UUID
 
-6. Check presence: GET presence:{B_id} in Redis
-   → If "online":
-       PUBLISH chat:user:{B_id} <serialized message>
-       → B's server instance receives, pushes to B's WebSocket
-       → B's client sends {type:"ack", message_id:"..."}
-       → Server receives ack: UPDATE messages SET status='delivered'
-       → PUBLISH chat:user:{A_id} {type:"delivered", message_id:"..."}
-   → If offline:
-       Message stays in DB with status='sent'
-       Delivered on B's next WebSocket connect (see reconnect flow)
+6. Local delivery attempted via hub.Send(receiverID):
+   → If receiver is on THIS instance (hub.Send returns true):
+       Message delivered directly to B's WebSocket
+       UPDATE messages SET status='delivered' immediately (prevents reconnect re-delivery)
+   → If receiver is on ANOTHER instance (hub.Send returns false):
+       PUBLISH chat:user:{B_id} <serialized message> via Redis pub/sub
+       Message stays 'sent' until B's instance marks it delivered
 
 7. Server returns {type:"sent", message_id:"<uuid>", id:"<client-uuid>"} to A
    (client-uuid echoed back for client-side dedup/correlation)
+
+**Reconnect flow:**
+On WebSocket connect, server queries:
+```sql
+SELECT m.*, u.username FROM messages m
+JOIN chat_members cm ON cm.chat_id = m.chat_id
+JOIN users u ON u.id = m.sender_id
+WHERE cm.user_id = $1 AND m.sender_id != $1 AND m.status = 'sent'
+ORDER BY m.created_at ASC LIMIT 100
+```
+Pushes all pending messages, then marks each as `delivered`.
+Only messages with `status='sent'` are re-delivered — messages already delivered locally are skipped (duplicate prevention).
 ```
 
 **Reconnect flow:**
@@ -356,6 +374,17 @@ useWebRTC(targetUserId: string)
   // RTCPeerConnection lifecycle: offer/answer/ICE, DataChannel for file transfer
 ```
 
+### State Persistence
+Zustand store uses `persist` middleware — auth token, DM messages, and contacts are saved to `localStorage` under key `p2p-chat-store`. State survives page refresh without re-fetching from server.
+
+**Critical selector pattern:** Zustand selectors must not return new object/array references on every render. Use:
+```ts
+// Correct — selector returns stable reference
+const messages = useStore((s) => s.dmMessages[partnerId]) ?? []
+// Wrong — creates new [] on every render → infinite re-render loop
+const messages = useStore((s) => s.dmMessages[partnerId] ?? [])
+```
+
 ### Tailwind UI components
 - `MessageBubble` — sent/received styling, timestamp, read receipt tick (✓/✓✓)
 - `TypingIndicator` — animated dots, auto-hide after typing TTL
@@ -396,32 +425,47 @@ docker-compose up   # starts server + postgres + redis
 
 `docker-compose.yml` services: `server` (Go binary), `postgres:16`, `redis:7-alpine`
 
-### Fly.io Production
-```bash
-fly launch                          # initializes app from Dockerfile
-fly postgres create --name chat-db  # managed Postgres (free 256MB)
-fly redis create --name chat-redis  # Upstash Redis (free 256MB)
-fly secrets set JWT_SECRET=<secret> DATABASE_URL=<url> REDIS_URL=<url>
-fly deploy
+### Production (Free Tier — No Credit Card Required)
+
+| Service | Role | Notes |
+|---------|------|-------|
+| Render | Go server | Docker runtime, PORT=10000, free web service |
+| Supabase | PostgreSQL | Use Session pooler URL (IPv4) not Direct URL (IPv6) |
+| Upstash | Redis | Use `rediss://` TLS URL |
+| Netlify | React frontend | Build: `npm run build`, publish: `dist/` |
+
+**Server env vars (Render):**
+```
+DATABASE_URL=<supabase session pooler url>
+REDIS_URL=<upstash rediss:// url>
+JWT_SECRET=<random 32-byte hex>
+ENV=production
+PORT=10000
 ```
 
-`fly.toml` config:
-- `min_machines_running = 1`, `max_machines = 3`
-- Health check on `GET /health`
-- Internal port 8080
+**Frontend env vars (Netlify):**
+```
+VITE_WS_URL=wss://<app>.onrender.com
+VITE_API_URL=https://<app>.onrender.com
+```
+
+Note: Render free tier spins down after 15 min inactivity. First request after cold start takes ~30–50s. `render.yaml` in repo root configures the service.
 
 ### Dockerfile (multi-stage)
 ```dockerfile
-FROM golang:1.22 AS builder
+FROM golang:1.23-alpine AS builder
 WORKDIR /app
 COPY server/ .
-RUN go build -o chat-server ./...
+RUN go mod tidy
+RUN CGO_ENABLED=0 GOOS=linux go build -o chat-server .
 
-FROM gcr.io/distroless/base
-COPY --from=builder /app/chat-server /
+FROM gcr.io/distroless/static-debian12
+COPY --from=builder /app/chat-server /chat-server
 EXPOSE 8080
 CMD ["/chat-server"]
 ```
+
+Note: `go mod tidy` instead of `go mod download` — regenerates `go.sum` during build to avoid missing dependency entries. Uses `distroless/static-debian12` (not `base`) for a fully static binary.
 
 ---
 
