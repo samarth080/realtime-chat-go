@@ -217,7 +217,7 @@ export function ChatWindow({ partnerId, partnerName, send }: Props) {
           display: 'flex', gap: 10, alignItems: 'flex-end',
           background: 'rgba(0,0,0,0.35)',
           border: '1px solid rgba(99,102,241,0.2)',
-          borderRadius: 16, padding: '8px 8px 8px 16px',
+          borderRadius: 16, padding: '10px 10px 10px 16px',
           transition: 'border-color 0.2s, box-shadow 0.2s',
         }}
           onFocusCapture={(e) => {
@@ -238,16 +238,16 @@ export function ChatWindow({ partnerId, partnerName, send }: Props) {
             onKeyDown={handleKeyDown}
             style={{
               flex: 1, background: 'transparent', border: 'none', outline: 'none',
-              color: '#ededef', fontSize: 13, resize: 'none', maxHeight: 120,
+              color: '#ededef', fontSize: 15, resize: 'none', maxHeight: 120,
               fontFamily: "'JetBrains Mono', monospace", lineHeight: 1.5,
-              paddingTop: 4,
+              paddingTop: 6, minHeight: 28,
             }}
           />
           <button
             onClick={handleSend}
             disabled={!body.trim()}
             style={{
-              width: 38, height: 38, borderRadius: 12, border: 'none',
+              width: 44, height: 44, borderRadius: 12, border: 'none',
               background: body.trim()
                 ? 'linear-gradient(135deg, #6366f1, #8b5cf6)'
                 : 'rgba(99,102,241,0.15)',
