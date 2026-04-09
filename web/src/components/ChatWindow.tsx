@@ -44,7 +44,7 @@ export function ChatWindow({ partnerId, partnerName, send }: Props) {
       if (history.length === 0) return
       const mapped = history.map((m) => ({
         id: m.id,
-        from: m.from_id === userId ? (username ?? '') : partnerName,
+        from: m.from,   // actual username from DB join
         from_id: m.from_id,
         body: m.body,
         timestamp: m.timestamp,

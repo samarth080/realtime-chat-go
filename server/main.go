@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -247,33 +248,53 @@ func main() {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "chat lookup failed"})
 			return
 		}
-		msgs, err := db.GetChatHistory(c.Request.Context(), pool, chatID, limit, 0)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "history fetch failed"})
-			return
-		}
-		// Reverse so oldest-first
-		for i, j := 0, len(msgs)-1; i < j; i, j = i+1, j-1 {
-			msgs[i], msgs[j] = msgs[j], msgs[i]
-		}
 		type msgJSON struct {
 			ID        string `json:"id"`
+			From      string `json:"from"`
 			SenderID  string `json:"from_id"`
 			Body      string `json:"body"`
 			Status    string `json:"status"`
 			Timestamp string `json:"timestamp"`
 		}
-		out := make([]msgJSON, len(msgs))
-		for i, m := range msgs {
-			out[i] = msgJSON{
-				ID:        m.ID.String(),
-				SenderID:  m.SenderID.String(),
-				Body:      m.Body,
-				Status:    m.Status,
-				Timestamp: m.CreatedAt.UTC().Format("2006-01-02T15:04:05Z"),
-			}
+		rows, err := pool.Query(c.Request.Context(), `
+			SELECT m.id, u.username, m.sender_id, m.body, m.status, m.created_at
+			FROM messages m
+			JOIN users u ON u.id = m.sender_id
+			WHERE m.chat_id = $1
+			ORDER BY m.created_at ASC
+			LIMIT $2
+		`, chatID, limit)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "history fetch failed"})
+			return
 		}
-		c.JSON(http.StatusOK, out)
+		defer rows.Close()
+		var result []msgJSON
+		for rows.Next() {
+			var (
+				msgID    uuid.UUID
+				from     string
+				senderID uuid.UUID
+				body     string
+				status   string
+				ts       time.Time
+			)
+			if err := rows.Scan(&msgID, &from, &senderID, &body, &status, &ts); err != nil {
+				continue
+			}
+			result = append(result, msgJSON{
+				ID:        msgID.String(),
+				From:      from,
+				SenderID:  senderID.String(),
+				Body:      body,
+				Status:    status,
+				Timestamp: ts.UTC().Format("2006-01-02T15:04:05Z"),
+			})
+		}
+		if result == nil {
+			result = []msgJSON{}
+		}
+		c.JSON(http.StatusOK, result)
 	})
 
 	r.GET("/ws", middleware.JWTAuth(cfg.JWTSecret), ws.ServeWS(hub, dispatcher, onConnect, onDisconnect))

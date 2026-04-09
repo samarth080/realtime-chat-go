@@ -47,6 +47,7 @@ export async function login(username: string, password: string): Promise<AuthRes
 
 export interface HistoryMessage {
   id: string
+  from: string
   from_id: string
   body: string
   status: string
