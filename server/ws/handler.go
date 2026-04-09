@@ -39,6 +39,12 @@ func ServeWS(hub *Hub, dispatcher Dispatcher, onConnect ConnectHook, onDisconnec
 			return
 		}
 
+		ip := c.GetHeader("X-Forwarded-For")
+		if ip == "" {
+			ip = c.ClientIP()
+		}
+		log.Printf("connect: user=%s ip=%s", username, ip)
+
 		client := newRealClient(userID, username)
 		hub.Register(client)
 

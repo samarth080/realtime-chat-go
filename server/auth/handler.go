@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -43,6 +44,11 @@ func (h *Handler) Register(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate token"})
 		return
 	}
+	ip := c.GetHeader("X-Forwarded-For")
+	if ip == "" {
+		ip = c.ClientIP()
+	}
+	log.Printf("register: user=%s ip=%s", user.Username, ip)
 	c.JSON(http.StatusCreated, gin.H{
 		"token":    token,
 		"user_id":  user.ID,
@@ -79,6 +85,11 @@ func (h *Handler) Login(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate token"})
 		return
 	}
+	ip := c.GetHeader("X-Forwarded-For")
+	if ip == "" {
+		ip = c.ClientIP()
+	}
+	log.Printf("login: user=%s ip=%s", user.Username, ip)
 	c.JSON(http.StatusOK, gin.H{
 		"token":    token,
 		"user_id":  user.ID,
