@@ -23,6 +23,7 @@ export function ChatWindow({ partnerId, partnerName, send }: Props) {
   const isTyping = useStore((s) => s.typing[partnerId])
   const presence = useStore((s) => s.presence)
   const addDMMessage = useStore((s) => s.addDMMessage)
+  const updateDMMessageStatus = useStore((s) => s.updateDMMessageStatus)
 
   const [body, setBody] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -39,9 +40,11 @@ export function ChatWindow({ partnerId, partnerName, send }: Props) {
       if (!m.mine && m.status !== 'read' && !ackedIds.current.has(m.id)) {
         ackedIds.current.add(m.id)
         send({ type: 'ack', message_id: m.id, sender_id: partnerId })
+        // Mark as read locally so unread count clears immediately for the reader
+        updateDMMessageStatus(partnerId, m.id, 'read')
       }
     })
-  }, [messages, send, partnerId])
+  }, [messages, send, partnerId, updateDMMessageStatus])
 
   function handleTyping() {
     send({ type: 'typing', to: partnerId })

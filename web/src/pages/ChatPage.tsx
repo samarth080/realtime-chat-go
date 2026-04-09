@@ -28,10 +28,7 @@ export function ChatPage() {
     name: dmMessages[id].find((m) => m.from_id === id)?.from ?? id.slice(0, 8),
     lastMessage: dmMessages[id].at(-1)?.body,
     lastTime: dmMessages[id].at(-1)?.timestamp,
-    // Zero out unread for the currently open chat — user is actively reading it
-    unread: id === selectedContact?.id
-      ? 0
-      : dmMessages[id].filter((m) => !m.mine && m.status !== 'read').length,
+    unread: dmMessages[id].filter((m) => !m.mine && m.status !== 'read').length,
   }))
 
   function handleCopyId() {
