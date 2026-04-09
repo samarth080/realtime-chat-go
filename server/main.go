@@ -232,6 +232,50 @@ func main() {
 		router.Unsubscribe(userID)
 	}
 
+	// Chat history: GET /messages?partner_id=<uuid>&limit=50
+	r.GET("/messages", middleware.JWTAuth(cfg.JWTSecret), func(c *gin.Context) {
+		myID := c.MustGet("user_id").(uuid.UUID)
+		partnerIDStr := c.Query("partner_id")
+		partnerID, err := uuid.Parse(partnerIDStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid partner_id"})
+			return
+		}
+		limit := 50
+		chatID, err := db.FindOrCreateChat(c.Request.Context(), pool, myID, partnerID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "chat lookup failed"})
+			return
+		}
+		msgs, err := db.GetChatHistory(c.Request.Context(), pool, chatID, limit, 0)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "history fetch failed"})
+			return
+		}
+		// Reverse so oldest-first
+		for i, j := 0, len(msgs)-1; i < j; i, j = i+1, j-1 {
+			msgs[i], msgs[j] = msgs[j], msgs[i]
+		}
+		type msgJSON struct {
+			ID        string `json:"id"`
+			SenderID  string `json:"from_id"`
+			Body      string `json:"body"`
+			Status    string `json:"status"`
+			Timestamp string `json:"timestamp"`
+		}
+		out := make([]msgJSON, len(msgs))
+		for i, m := range msgs {
+			out[i] = msgJSON{
+				ID:        m.ID.String(),
+				SenderID:  m.SenderID.String(),
+				Body:      m.Body,
+				Status:    m.Status,
+				Timestamp: m.CreatedAt.UTC().Format("2006-01-02T15:04:05Z"),
+			}
+		}
+		c.JSON(http.StatusOK, out)
+	})
+
 	r.GET("/ws", middleware.JWTAuth(cfg.JWTSecret), ws.ServeWS(hub, dispatcher, onConnect, onDisconnect))
 
 	addr := ":" + cfg.Port

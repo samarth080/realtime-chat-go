@@ -44,3 +44,20 @@ export async function login(username: string, password: string): Promise<AuthRes
   }
   return res.json()
 }
+
+export interface HistoryMessage {
+  id: string
+  from_id: string
+  body: string
+  status: string
+  timestamp: string
+}
+
+export async function fetchHistory(partnerId: string, token: string): Promise<HistoryMessage[]> {
+  const res = await fetch(`${BASE}/messages?partner_id=${partnerId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+    signal: AbortSignal.timeout(10000),
+  })
+  if (!res.ok) return []
+  return res.json()
+}

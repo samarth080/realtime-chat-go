@@ -37,6 +37,8 @@ interface ChatStore {
   // DMs: keyed by the other user's ID
   dmMessages: Record<string, Message[]>
   addDMMessage: (chatPartnerId: string, msg: Message) => void
+  // Replace a conversation's messages with server history (deduplicates by id)
+  setDMHistory: (chatPartnerId: string, msgs: Message[]) => void
   // Swap client-generated UUID with server UUID and mark delivered
   confirmDMMessage: (chatPartnerId: string, clientId: string, serverMessageId: string) => void
   updateDMMessageStatus: (chatPartnerId: string, messageId: string, status: Message['status']) => void
@@ -67,10 +69,8 @@ export const useStore = create<ChatStore>()(persist((set) => ({
   username: null,
 
   setAuth: (token, userId, username) => set({ token, userId, username }),
-  clearAuth: () => set({
-    token: null, userId: null, username: null,
-    dmMessages: {}, groups: [], groupMessages: {},
-  }),
+  // Only clear auth credentials — messages stay so history survives logout/login
+  clearAuth: () => set({ token: null, userId: null, username: null }),
 
   dmMessages: {},
   addDMMessage: (chatPartnerId, msg) =>
@@ -80,6 +80,16 @@ export const useStore = create<ChatStore>()(persist((set) => ({
         [chatPartnerId]: [...(s.dmMessages[chatPartnerId] ?? []), msg],
       },
     })),
+  setDMHistory: (chatPartnerId, msgs) =>
+    set((s) => {
+      // Merge: server history as base, keep any local messages not in history (e.g. optimistic sends)
+      const serverIds = new Set(msgs.map((m) => m.id))
+      const localOnly = (s.dmMessages[chatPartnerId] ?? []).filter((m) => !serverIds.has(m.id))
+      const merged = [...msgs, ...localOnly].sort(
+        (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+      )
+      return { dmMessages: { ...s.dmMessages, [chatPartnerId]: merged } }
+    }),
   confirmDMMessage: (chatPartnerId, clientId, serverMessageId) =>
     set((s) => ({
       dmMessages: {

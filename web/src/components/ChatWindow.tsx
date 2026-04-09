@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useStore } from '../store'
 import { MessageBubble } from './MessageBubble'
 import { TypingIndicator } from './TypingIndicator'
+import { fetchHistory } from '../api'
 import { v4 as uuidv4 } from 'uuid'
 import { Send, Phone, Video } from 'lucide-react'
 
@@ -19,11 +20,13 @@ const AVATAR_COLORS: [string, string][] = [
 export function ChatWindow({ partnerId, partnerName, send }: Props) {
   const userId = useStore((s) => s.userId)
   const username = useStore((s) => s.username)
+  const token = useStore((s) => s.token)
   const messages = useStore((s) => s.dmMessages[partnerId]) ?? []
   const isTyping = useStore((s) => s.typing[partnerId])
   const presence = useStore((s) => s.presence)
   const addDMMessage = useStore((s) => s.addDMMessage)
   const updateDMMessageStatus = useStore((s) => s.updateDMMessageStatus)
+  const setDMHistory = useStore((s) => s.setDMHistory)
 
   const [body, setBody] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -33,6 +36,24 @@ export function ChatWindow({ partnerId, partnerName, send }: Props) {
 
   const isOnline = !!presence[partnerId]
   const [from, to] = AVATAR_COLORS[partnerName.charCodeAt(0) % AVATAR_COLORS.length]
+
+  // Load history from server when opening a chat
+  useEffect(() => {
+    if (!token) return
+    fetchHistory(partnerId, token).then((history) => {
+      if (history.length === 0) return
+      const mapped = history.map((m) => ({
+        id: m.id,
+        from: m.from_id === userId ? (username ?? '') : partnerName,
+        from_id: m.from_id,
+        body: m.body,
+        timestamp: m.timestamp,
+        status: (m.status ?? 'delivered') as 'sent' | 'delivered' | 'read',
+        mine: m.from_id === userId,
+      }))
+      setDMHistory(partnerId, mapped)
+    }).catch(() => {/* silently ignore — local messages still shown */})
+  }, [partnerId, token]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
