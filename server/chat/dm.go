@@ -77,10 +77,11 @@ func HandleDM(ctx context.Context, pool *pgxpool.Pool, hub *ws.Hub, router Route
 	return nil
 }
 
-// HandleAck processes a delivery acknowledgement from receiver
-func HandleAck(ctx context.Context, pool *pgxpool.Pool, hub *ws.Hub, senderID uuid.UUID, raw []byte) error {
+// HandleAck processes a read receipt from receiver — marks message as read and notifies sender
+func HandleAck(ctx context.Context, pool *pgxpool.Pool, hub *ws.Hub, router Router, readerID uuid.UUID, raw []byte) error {
 	var payload struct {
 		MessageID string `json:"message_id"`
+		SenderID  string `json:"sender_id"`
 	}
 	if err := json.Unmarshal(raw, &payload); err != nil {
 		return err
@@ -89,5 +90,21 @@ func HandleAck(ctx context.Context, pool *pgxpool.Pool, hub *ws.Hub, senderID uu
 	if err != nil {
 		return err
 	}
-	return db.UpdateMessageStatus(ctx, pool, msgID, "delivered")
+	if err := db.UpdateMessageStatus(ctx, pool, msgID, "read"); err != nil {
+		return err
+	}
+	// Notify the original sender that their message was read
+	if payload.SenderID != "" {
+		senderID, err := uuid.Parse(payload.SenderID)
+		if err == nil {
+			notify, _ := json.Marshal(map[string]interface{}{
+				"type":       "read",
+				"message_id": msgID,
+			})
+			if !hub.Send(senderID, notify) && router != nil {
+				router.Publish(ctx, senderID, notify)
+			}
+		}
+	}
+	return nil
 }

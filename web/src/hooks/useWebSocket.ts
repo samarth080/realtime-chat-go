@@ -13,6 +13,7 @@ export function useWebSocket() {
   const token = useStore((s) => s.token)
   const dmMessages = useStore((s) => s.dmMessages)
   const addDMMessage = useStore((s) => s.addDMMessage)
+  const updateDMMessageStatus = useStore((s) => s.updateDMMessageStatus)
   const addGroupMessage = useStore((s) => s.addGroupMessage)
   const setPresence = useStore((s) => s.setPresence)
   const setTyping = useStore((s) => s.setTyping)
@@ -22,9 +23,9 @@ export function useWebSocket() {
   const reconnectDelay = useRef(1000)
 
   // Keep store callbacks in a ref so the effect never needs to re-run for them
-  const cbRef = useRef({ addDMMessage, addGroupMessage, setPresence, setTyping, dmMessages })
+  const cbRef = useRef({ addDMMessage, updateDMMessageStatus, addGroupMessage, setPresence, setTyping, dmMessages })
   useEffect(() => {
-    cbRef.current = { addDMMessage, addGroupMessage, setPresence, setTyping, dmMessages }
+    cbRef.current = { addDMMessage, updateDMMessageStatus, addGroupMessage, setPresence, setTyping, dmMessages }
   })
 
   useEffect(() => {
@@ -78,6 +79,19 @@ export function useWebSocket() {
           }
           case 'sent':
             break
+          case 'read': {
+            // Server tells us our message was read — find which conversation and update
+            const messageId = msg.message_id as string
+            const { dmMessages, updateDMMessageStatus } = cbRef.current
+            for (const partnerId of Object.keys(dmMessages)) {
+              const found = dmMessages[partnerId]?.find((m) => m.id === messageId)
+              if (found) {
+                updateDMMessageStatus(partnerId, messageId, 'read')
+                break
+              }
+            }
+            break
+          }
           case 'group_message':
             addGroupMessage(msg.group_id as string, {
               id: msg.message_id as string,

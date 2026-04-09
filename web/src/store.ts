@@ -37,6 +37,7 @@ interface ChatStore {
   // DMs: keyed by the other user's ID
   dmMessages: Record<string, Message[]>
   addDMMessage: (chatPartnerId: string, msg: Message) => void
+  updateDMMessageStatus: (chatPartnerId: string, messageId: string, status: Message['status']) => void
 
   // Groups
   groups: Group[]
@@ -75,6 +76,15 @@ export const useStore = create<ChatStore>()(persist((set) => ({
       dmMessages: {
         ...s.dmMessages,
         [chatPartnerId]: [...(s.dmMessages[chatPartnerId] ?? []), msg],
+      },
+    })),
+  updateDMMessageStatus: (chatPartnerId, messageId, status) =>
+    set((s) => ({
+      dmMessages: {
+        ...s.dmMessages,
+        [chatPartnerId]: (s.dmMessages[chatPartnerId] ?? []).map((m) =>
+          m.id === messageId ? { ...m, status } : m
+        ),
       },
     })),
 

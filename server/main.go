@@ -67,7 +67,7 @@ func (d *MessageDispatcher) Dispatch(env ws.InboundEnvelope) {
 			log.Printf("HandleLeaveGroup error: %v", err)
 		}
 	case "ack":
-		if err := chat.HandleAck(env.Ctx, d.pool, d.hub, env.SenderID, env.Data); err != nil {
+		if err := chat.HandleAck(env.Ctx, d.pool, d.hub, d.router, env.SenderID, env.Data); err != nil {
 			log.Printf("HandleAck error: %v", err)
 		}
 	case "typing":

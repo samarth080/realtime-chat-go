@@ -19,10 +19,18 @@ export function ChatWindow({ partnerId, partnerName, send }: Props) {
   const [body, setBody] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const ackedIds = useRef<Set<string>>(new Set())
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+    // Send read ack for all unread messages from partner
+    messages.forEach((m) => {
+      if (!m.mine && m.status !== 'read' && !ackedIds.current.has(m.id)) {
+        ackedIds.current.add(m.id)
+        send({ type: 'ack', message_id: m.id, sender_id: partnerId })
+      }
+    })
+  }, [messages, send, partnerId])
 
   function handleTyping() {
     send({ type: 'typing', to: partnerId })
