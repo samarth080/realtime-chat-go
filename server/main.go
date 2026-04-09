@@ -86,6 +86,29 @@ func (d *MessageDispatcher) Dispatch(env ws.InboundEnvelope) {
 		if err := presence.SetTyping(env.Ctx, d.rdb, d.hub, chatID, env.SenderID, env.SenderName, memberIDs); err != nil {
 			log.Printf("SetTyping error: %v", err)
 		}
+	case "presence_check":
+		var payload struct {
+			UserIDs []string `json:"user_ids"`
+		}
+		if err := json.Unmarshal(env.Data, &payload); err != nil {
+			return
+		}
+		for _, idStr := range payload.UserIDs {
+			id, err := uuid.Parse(idStr)
+			if err != nil {
+				continue
+			}
+			status := "offline"
+			if presence.IsOnline(env.Ctx, d.rdb, id) {
+				status = "online"
+			}
+			data, _ := json.Marshal(map[string]interface{}{
+				"type":    "presence",
+				"user_id": id,
+				"status":  status,
+			})
+			d.hub.Send(env.SenderID, data)
+		}
 	case "ping":
 		if err := presence.SetOnline(env.Ctx, d.rdb, env.SenderID); err != nil {
 			log.Printf("SetOnline error: %v", err)

@@ -44,20 +44,23 @@ export function LoginForm() {
             onKeyDown={(e) => e.key === 'Enter' && handleSubmit('login')}
           />
           {error && <p className="text-red-400 text-sm">{error}</p>}
+          {loading && (
+            <p className="text-gray-400 text-xs text-center">Connecting to server, please wait...</p>
+          )}
           <div className="flex gap-2">
             <button
               onClick={() => handleSubmit('login')}
               disabled={loading}
-              className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg py-2 font-medium transition"
+              className="flex-1 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-lg py-2 font-medium transition"
             >
-              Login
+              {loading ? '...' : 'Login'}
             </button>
             <button
               onClick={() => handleSubmit('register')}
               disabled={loading}
-              className="flex-1 bg-gray-700 hover:bg-gray-600 text-white rounded-lg py-2 font-medium transition"
+              className="flex-1 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-white rounded-lg py-2 font-medium transition"
             >
-              Register
+              {loading ? '...' : 'Register'}
             </button>
           </div>
         </div>

@@ -1,10 +1,17 @@
 import { useEffect, useRef, useCallback } from 'react'
 import { useStore } from '../store'
 
+function checkPresence(ws: WebSocket, userIds: string[]) {
+  if (ws.readyState === WebSocket.OPEN && userIds.length > 0) {
+    ws.send(JSON.stringify({ type: 'presence_check', user_ids: userIds }))
+  }
+}
+
 const WS_URL = import.meta.env.VITE_WS_URL ?? ''
 
 export function useWebSocket() {
   const token = useStore((s) => s.token)
+  const dmMessages = useStore((s) => s.dmMessages)
   const addDMMessage = useStore((s) => s.addDMMessage)
   const addGroupMessage = useStore((s) => s.addGroupMessage)
   const setPresence = useStore((s) => s.setPresence)
@@ -15,9 +22,9 @@ export function useWebSocket() {
   const reconnectDelay = useRef(1000)
 
   // Keep store callbacks in a ref so the effect never needs to re-run for them
-  const cbRef = useRef({ addDMMessage, addGroupMessage, setPresence, setTyping })
+  const cbRef = useRef({ addDMMessage, addGroupMessage, setPresence, setTyping, dmMessages })
   useEffect(() => {
-    cbRef.current = { addDMMessage, addGroupMessage, setPresence, setTyping }
+    cbRef.current = { addDMMessage, addGroupMessage, setPresence, setTyping, dmMessages }
   })
 
   useEffect(() => {
@@ -34,10 +41,17 @@ export function useWebSocket() {
 
       ws.onopen = () => {
         reconnectDelay.current = 1000
-        const hb = setInterval(
-          () => ws.readyState === WebSocket.OPEN && ws.send(JSON.stringify({ type: 'ping' })),
-          20000,
-        )
+        // Check presence for all existing contacts immediately on connect
+        const contactIds = Object.keys(cbRef.current.dmMessages)
+        checkPresence(ws, contactIds)
+        const hb = setInterval(() => {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'ping' }))
+            // Re-check presence every heartbeat
+            const ids = Object.keys(cbRef.current.dmMessages)
+            checkPresence(ws, ids)
+          }
+        }, 20000)
         ws.addEventListener('close', () => clearInterval(hb), { once: true })
       }
 
@@ -58,6 +72,8 @@ export function useWebSocket() {
               status: 'delivered',
               mine: false,
             })
+            // Check presence for this contact if they just appeared
+            checkPresence(ws, [fromId])
             break
           }
           case 'sent':
