@@ -2,7 +2,7 @@
 
 A production-grade real-time chat application built with **Go**, **PostgreSQL**, and **Redis**. Features WebSocket-based messaging, JWT authentication, Redis pub/sub for horizontal scaling, WebRTC signaling, presence tracking, typing indicators, and rate limiting.
 
-**Live demo:** [https://p2p-chat-app.netlify.app](https://p2p-chat-app.netlify.app)
+**Live demo:** [https://realtime-chat-go.vercel.app](https://realtime-chat-go.vercel.app)
 
 ---
 
@@ -30,7 +30,7 @@ This project and its source code are proprietary. No part of this software may b
 | Database | PostgreSQL 16, pgx/v5 |
 | Cache / Pub-Sub | Redis 7, go-redis/v9 |
 | Frontend | React 18, TypeScript, Vite, Tailwind CSS, Zustand |
-| Deploy | Render (server) · Supabase (DB) · Upstash (Redis) · Netlify (frontend) |
+| Deploy | Render (server) · Supabase (DB) · Upstash (Redis) · Vercel (frontend) |
 
 ---
 
@@ -111,7 +111,7 @@ realtime-chat-go/
 │   │   ├── hooks/           # useWebSocket (auto-reconnect, message dispatch)
 │   │   ├── store.ts         # Zustand store with persist middleware
 │   │   └── api.ts           # REST helpers (register, login)
-│   └── public/_redirects    # Netlify SPA routing
+│   └── public/              # Static assets
 ├── migrations/              # PostgreSQL schema (golang-migrate)
 ├── docker-compose.yml       # Local dev: server + postgres + redis
 ├── Dockerfile               # Multi-stage Go build (distroless runtime)
@@ -168,7 +168,7 @@ This project is deployed using four free-tier services:
 | [Render](https://render.com) | Go server hosting | Free web service |
 | [Supabase](https://supabase.com) | PostgreSQL database | Free tier |
 | [Upstash](https://upstash.com) | Redis | Free tier |
-| [Netlify](https://netlify.com) | React frontend | Free tier |
+| [Vercel](https://vercel.com) | React frontend | Free tier |
 
 ### 1. Database — Supabase
 
@@ -197,13 +197,14 @@ This project is deployed using four free-tier services:
    PORT=10000
    ```
 
-### 4. Frontend — Netlify
+### 4. Frontend — Vercel
 
-1. Connect your GitHub repo at [netlify.com](https://netlify.com)
-2. **Base directory:** `web`
-3. **Build command:** `npm run build`
-4. **Publish directory:** `web/dist`
-5. Set environment variables:
+1. Connect your GitHub repo at [vercel.com](https://vercel.com)
+2. **Framework Preset:** Vite
+3. **Root Directory:** `web`
+4. **Build Command:** `npm run build`
+5. **Output Directory:** `dist`
+6. Set environment variables:
    ```
    VITE_WS_URL=wss://<your-render-app>.onrender.com
    VITE_API_URL=https://<your-render-app>.onrender.com
