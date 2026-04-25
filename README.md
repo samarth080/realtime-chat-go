@@ -254,3 +254,4 @@ Connect: `GET /ws?token=<jwt>`
 - **Production readiness** — JWT auth, bcrypt, rate limiting, Docker (distroless), health checks, CORS
 - **Database design** — UUID PKs, composite indexes, cascading deletes, type-safe pgx queries
 - **Frontend state** — Zustand with persist middleware, anti-pattern-safe selectors, auto-reconnecting WebSocket
+- under maintenance for now 
